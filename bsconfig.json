@@ -4,10 +4,6 @@
   "sources": [{
     "dir": "src",
     "subdirs": true
-  }, {
-    "dir": "test",
-    "type": "dev",
-    "subdirs": true
   }],
   "package-specs": {
     "in-source": true,
@@ -15,7 +11,6 @@
     "suffix": ".cjs"
   },
   "bs-dev-dependencies": [
-    "rescript-nodejs",
-    "rescript-ava"
+    "rescript-nodejs"
   ]
 }

@@ -7,9 +7,12 @@ let run = P.run(Json.parse)
 let {map, forEach} = module(Belt.Array)
 
 let readFiles = dirname => {
-  Node.Fs.readdirSync("test/json/inputs/" ++ dirname)
+  NodeJs.Fs.readdirSync("test/json/inputs/" ++ dirname)
   ->map(name => (name, "test/json/inputs/" ++ dirname ++ "/" ++ name))
-  ->map(((filename, pathname)) => (filename, Node.Fs.readFileAsUtf8Sync(pathname)))
+  ->map(((filename, pathname)) => (
+    filename,
+    NodeJs.Fs.readFileSyncWith(pathname, {encoding: "utf8"})->NodeJs.Buffer.toString,
+  ))
 }
 
 let passes = readFiles("passes")

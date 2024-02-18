@@ -1,3 +1,6 @@
+@@uncurried
+@@uncurried.swap
+
 module Position = {
   type t = {
     prevLines: list<(int, int)>,
@@ -60,7 +63,7 @@ module State = {
 
   let fromString = input => {
     position: Position.make(),
-    input: input,
+    input,
   }
 
   let remaining = t => {
@@ -93,8 +96,8 @@ module Error = {
   type t = {message: string, state: State.t}
 
   let fromInput = (state, message) => {
-    state: state,
-    message: message,
+    state,
+    message,
   }
 }
 
@@ -166,7 +169,7 @@ let satisfy: satisfy = predicate => Parser(
   },
 )
 
-let char: char_ = expected => satisfy(Char.equal(expected))
+let char: char_ = expected => satisfy(Char.equal(expected, _))
 let orElse: orElse<'a> = (parser1, parser2) => Parser(
   input => {
     let result = runOnInput(parser1, input)
@@ -179,22 +182,28 @@ let orElse: orElse<'a> = (parser1, parser2) => Parser(
 )
 
 let choice: choice<'a> = parsers =>
-  parsers->Belt.Array.reduce(
+  parsers->Belt.Array.reduceU(
     Parser(input => Error({message: "Initial parser", state: input})),
     orElse,
   )
 
-let anyOf: anyOf = chars => chars->Belt.Array.map(char)->choice
+let anyOf: anyOf = chars => chars->Belt.Array.mapU(char)->choice
 
 let apply: apply<'a, 'b> = (parserA, parserB) =>
   parserB->bind(f => parserA->bind(x => return(f(x))))
 
-let lift2: lift2<'a, 'b, 'c> = (parserA, fn, parserB) => apply(parserB, apply(parserA, return(fn)))
+//type lift2<'a, 'b, 'c> = (t<'a>, (. 'a, 'b) => 'c, t<'b>) => t<'c>
+
+let lift2 = (parserA, fn, parserB) => {
+  let r1 = return(fn)
+  let a1 = apply(parserA, r1)
+  apply(parserB, a1)
+}
 
 let rec sequence: sequence<'a> = (parsers: list<t<'a>>) =>
   switch parsers {
   | list{} => return(list{})
-  | list{head, ...tail} => lift2(head, List.cons, sequence(tail))
+  | list{head, ...tail} => lift2(head, a => List.cons(a, _), sequence(tail))
   }
 
 let rec zeroOrMore: zeroOrMore<'a> = (parser, input) =>
@@ -233,13 +242,13 @@ let separatedBy: separatedBy<'a, 'b> = (parser, separator) => {
 let string = x => {
   x
   ->Js.String2.split("")
-  ->Belt.Array.map(String.get(_, 0))
-  ->Belt.Array.map(char)
+  ->Belt.Array.mapU(String.get(_, 0))
+  ->Belt.Array.mapU(char)
   ->Belt.List.fromArray
   ->sequence
   ->map(Belt.List.map(_, Char.escaped))
-  ->map(Belt.List.toArray)
-  ->map(Js.Array.joinWith(""))
+  ->map(l => Belt.List.toArray(l))
+  ->map(Js.Array.joinWith("", _))
 }
 
 let makeForwardRef: makeForwardRef<'t> = () => {

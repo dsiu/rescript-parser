@@ -3,15 +3,16 @@
 
 var Char = require("rescript/lib/js/char.js");
 var List = require("rescript/lib/js/list.js");
-var Curry = require("rescript/lib/js/curry.js");
+var Js_array = require("rescript/lib/js/js_array.js");
 var Belt_List = require("rescript/lib/js/belt_List.js");
+var Js_string = require("rescript/lib/js/js_string.js");
 var Belt_Array = require("rescript/lib/js/belt_Array.js");
-var Pervasives = require("rescript/lib/js/pervasives.js");
 var Belt_Option = require("rescript/lib/js/belt_Option.js");
 var Caml_option = require("rescript/lib/js/caml_option.js");
 var Caml_string = require("rescript/lib/js/caml_string.js");
+var PervasivesU = require("rescript/lib/js/pervasivesU.js");
 
-function make(param) {
+function make() {
   return {
           prevLines: /* [] */0,
           index: 0,
@@ -64,21 +65,19 @@ function getChar(t) {
 
 function next$1(t) {
   var match = getChar(t);
-  if (match !== undefined) {
-    if (match !== 10 && match !== 13) {
-      return {
-              position: next(t.position),
-              input: t.input
-            };
-    } else {
-      return {
-              position: newline(t.position),
-              input: t.input
-            };
-    }
-  } else {
+  if (match === undefined) {
     return t;
   }
+  if (match !== 10 && match !== 13) {
+    return {
+            position: next(t.position),
+            input: t.input
+          };
+  }
+  return {
+          position: newline(t.position),
+          input: t.input
+        };
 }
 
 function getPosition(t) {
@@ -99,7 +98,7 @@ function fromString(input) {
 }
 
 function remaining(t) {
-  return t.input.slice(t.position.index);
+  return Js_string.sliceToEnd(t.position.index, t.input);
 }
 
 function makeFrames(state) {
@@ -113,7 +112,7 @@ function makeFrames(state) {
                 var lineNumber = (line - index | 0) - 1 | 0;
                 return [
                         lineNumber,
-                        input.slice(param[0], param[1])
+                        Js_string.slice(param[0], param[1], input)
                       ];
               }));
 }
@@ -139,43 +138,36 @@ var $$Error = {
 };
 
 function runOnInput(t, input) {
-  return Curry._1(t._0, input);
+  return t._0(input);
 }
 
 function run(t, inputString) {
-  return runOnInput(t, {
-              position: {
-                prevLines: /* [] */0,
-                index: 0,
-                lineStart: 0,
-                line: 1,
-                col: 1
-              },
-              input: inputString
-            });
+  return runOnInput(t, fromString(inputString));
 }
 
 function bind(t, fn) {
-  return /* Parser */{
+  return {
+          TAG: "Parser",
           _0: (function (input) {
               var msg = runOnInput(t, input);
-              if (msg.TAG !== /* Ok */0) {
+              if (msg.TAG !== "Ok") {
                 return {
-                        TAG: /* Error */1,
+                        TAG: "Error",
                         _0: msg._0
                       };
               }
               var match = msg._0;
-              return runOnInput(Curry._1(fn, match[0]), match[1]);
+              return runOnInput(fn(match[0]), match[1]);
             })
         };
 }
 
 function $$return(x) {
-  return /* Parser */{
+  return {
+          TAG: "Parser",
           _0: (function (input) {
               return {
-                      TAG: /* Ok */0,
+                      TAG: "Ok",
                       _0: [
                         x,
                         input
@@ -187,7 +179,7 @@ function $$return(x) {
 
 function map(t, fn) {
   return bind(t, (function (x) {
-                return $$return(Curry._1(fn, x));
+                return $$return(fn(x));
               }));
 }
 
@@ -203,13 +195,14 @@ function andThen(p1, p2) {
 }
 
 function satisfy(predicate) {
-  return /* Parser */{
+  return {
+          TAG: "Parser",
           _0: (function (input) {
               var $$char = getChar(input);
               if ($$char !== undefined) {
-                if (Curry._1(predicate, $$char)) {
+                if (predicate($$char)) {
                   return {
-                          TAG: /* Ok */0,
+                          TAG: "Ok",
                           _0: [
                             $$char,
                             next$1(input)
@@ -217,7 +210,7 @@ function satisfy(predicate) {
                         };
                 } else {
                   return {
-                          TAG: /* Error */1,
+                          TAG: "Error",
                           _0: {
                             message: "Unexpected \"" + Char.escaped($$char) + "\".\n",
                             state: input
@@ -226,7 +219,7 @@ function satisfy(predicate) {
                 }
               } else {
                 return {
-                        TAG: /* Error */1,
+                        TAG: "Error",
                         _0: {
                           message: "No more input",
                           state: input
@@ -238,16 +231,17 @@ function satisfy(predicate) {
 }
 
 function $$char(expected) {
-  return satisfy(function (param) {
-              return Char.equal(expected, param);
+  return satisfy(function (__x) {
+              return Char.equal(expected, __x);
             });
 }
 
 function orElse(parser1, parser2) {
-  return /* Parser */{
+  return {
+          TAG: "Parser",
           _0: (function (input) {
               var result = runOnInput(parser1, input);
-              if (result.TAG === /* Ok */0) {
+              if (result.TAG === "Ok") {
                 return result;
               } else {
                 return runOnInput(parser2, input);
@@ -257,10 +251,11 @@ function orElse(parser1, parser2) {
 }
 
 function choice(parsers) {
-  return Belt_Array.reduce(parsers, /* Parser */{
+  return Belt_Array.reduceU(parsers, {
+              TAG: "Parser",
               _0: (function (input) {
                   return {
-                          TAG: /* Error */1,
+                          TAG: "Error",
                           _0: {
                             message: "Initial parser",
                             state: input
@@ -271,29 +266,36 @@ function choice(parsers) {
 }
 
 function anyOf(chars) {
-  return choice(Belt_Array.map(chars, $$char));
+  return choice(Belt_Array.mapU(chars, $$char));
 }
 
 function apply(parserA, parserB) {
   return bind(parserB, (function (f) {
                 return bind(parserA, (function (x) {
-                              return $$return(Curry._1(f, x));
+                              return $$return(f(x));
                             }));
               }));
 }
 
 function lift2(parserA, fn, parserB) {
-  return apply(parserB, apply(parserA, $$return(fn)));
+  var r1 = $$return(fn);
+  var a1 = apply(parserA, r1);
+  return apply(parserB, a1);
 }
 
 function sequence(parsers) {
   if (parsers) {
-    return lift2(parsers.hd, List.cons, sequence(parsers.tl));
+    return lift2(parsers.hd, (function (a) {
+                  return function (__x) {
+                    return List.cons(a, __x);
+                  };
+                }), sequence(parsers.tl));
   } else {
-    return /* Parser */{
+    return {
+            TAG: "Parser",
             _0: (function (input) {
                 return {
-                        TAG: /* Ok */0,
+                        TAG: "Ok",
                         _0: [
                           /* [] */0,
                           input
@@ -306,7 +308,7 @@ function sequence(parsers) {
 
 function zeroOrMore(parser, input) {
   var match = runOnInput(parser, input);
-  if (match.TAG !== /* Ok */0) {
+  if (match.TAG !== "Ok") {
     return [
             /* [] */0,
             input
@@ -324,10 +326,11 @@ function zeroOrMore(parser, input) {
 }
 
 function many(parser) {
-  return /* Parser */{
+  return {
+          TAG: "Parser",
           _0: (function (input) {
               return {
-                      TAG: /* Ok */0,
+                      TAG: "Ok",
                       _0: zeroOrMore(parser, input)
                     };
             })
@@ -372,10 +375,11 @@ function separatedBy1(parser, separator) {
 }
 
 function separatedBy(parser, separator) {
-  return orElse(separatedBy1(parser, separator), /* Parser */{
+  return orElse(separatedBy1(parser, separator), {
+              TAG: "Parser",
               _0: (function (input) {
                   return {
-                          TAG: /* Ok */0,
+                          TAG: "Ok",
                           _0: [
                             /* [] */0,
                             input
@@ -386,26 +390,28 @@ function separatedBy(parser, separator) {
 }
 
 function string(x) {
-  return map(map(map(sequence(Belt_List.fromArray(Belt_Array.map(Belt_Array.map(x.split(""), (function (__x) {
+  return map(map(map(sequence(Belt_List.fromArray(Belt_Array.mapU(Belt_Array.mapU(x.split(""), (function (__x) {
                                         return Caml_string.get(__x, 0);
                                       })), $$char))), (function (__x) {
                         return Belt_List.map(__x, Char.escaped);
-                      })), Belt_List.toArray), (function (param) {
-                return param.join("");
+                      })), Belt_List.toArray), (function (__x) {
+                return Js_array.joinWith("", __x);
               }));
 }
 
-function makeForwardRef(param) {
-  var parser = /* Parser */{
+function makeForwardRef() {
+  var parser = {
+    TAG: "Parser",
     _0: (function (param) {
-        return Pervasives.failwith("Not implemented");
+        return PervasivesU.failwith("Not implemented");
       })
   };
   var parserRef = {
     contents: parser
   };
   return [
-          /* Parser */{
+          {
+            TAG: "Parser",
             _0: (function (input) {
                 return runOnInput(parserRef.contents, input);
               })
@@ -415,9 +421,9 @@ function makeForwardRef(param) {
 }
 
 function makeRecursive(fn) {
-  var match = makeForwardRef(undefined);
+  var match = makeForwardRef();
   var parserRef = match[1];
-  parserRef.contents = Curry._1(fn, match[0]);
+  parserRef.contents = fn(match[0]);
   return parserRef.contents;
 }
 
@@ -425,10 +431,11 @@ function optional(parser) {
   var some = map(parser, (function (x) {
           return Caml_option.some(x);
         }));
-  var none = /* Parser */{
+  var none = {
+    TAG: "Parser",
     _0: (function (input) {
         return {
-                TAG: /* Ok */0,
+                TAG: "Ok",
                 _0: [
                   undefined,
                   input

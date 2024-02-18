@@ -16,12 +16,12 @@
     "parser"
   ],
   "devDependencies": {
-    "ava": "^3.15.0",
+    "ava": "^6.1.1",
     "onchange": "^7.1.0",
-    "prettier": "^2.5.1",
-    "rescript": "^9.1.4",
+    "prettier": "^3.2.5",
+    "rescript": "^11.1.0-rc.2",
     "rescript-ava": "^3.15.0",
-    "rescript-nodejs": "^14.2.0"
+    "rescript-nodejs": "^16.0.0"
   },
   "scripts": {
     "make": "rescript build -with-deps",
